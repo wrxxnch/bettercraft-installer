@@ -1,0 +1,6 @@
+{
+  "name": "BetterCraft Installer",
+  "description": "Installer and patcher for Luanti with BetterCraft modpack, featuring Minecraft Faithful 32x32 UI, APK repackager, webview, and remote config.",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}
