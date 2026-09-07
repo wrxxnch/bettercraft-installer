@@ -13,6 +13,7 @@ data class AppConfig(
     val bettercraftZipUrl: String = DEFAULT_BETTERCRAFT_ZIP_URL,
     val targetAssetsPath: String = DEFAULT_ASSETS_PATH,
     val webViewUrl: String = DEFAULT_WEBVIEW_URL,
+    val outputDirectoryPath: String = DEFAULT_OUTPUT_DIRECTORY_PATH,
     val serverMessage: String = "BetterCraft Voxel Edition v5.17.0 pronta para montagem!",
     val featuredLinks: List<DownloadLink> = defaultFeaturedLinks(),
     val adminEmails: List<String> = defaultAdmins()
@@ -23,13 +24,23 @@ data class AppConfig(
         const val DEFAULT_BETTERCRAFT_ZIP_URL =
             "https://github.com/wrxxnch/bettercraft/archive/refs/heads/main.zip"
         const val DEFAULT_ASSETS_PATH = "assets/assets.zip/games/bettercraft/"
-        const val DEFAULT_WEBVIEW_URL = "https://bettercraftsite.vercel.app"
+        const val DEFAULT_WEBVIEW_URL = "https://wrxxnch.github.io/bettercraftsite"
+        const val DEFAULT_GITHUB_RELEASE_URL = "https://github.com/wrxxnch/bettercraft/releases/latest"
+        const val DEFAULT_OUTPUT_DIRECTORY_PATH =
+            "/storage/emulated/0/Android/data/com.aistudio.bettercraft.vzkx/files/output/"
 
         fun defaultAdmins(): List<String> = listOf(
             AdminConstants.SUPER_ADMIN_EMAIL
         )
 
         fun defaultFeaturedLinks(): List<DownloadLink> = listOf(
+            DownloadLink(
+                id = "bettercraft_apk_release",
+                title = "BetterCraft APK (GitHub Releases)",
+                url = "https://github.com/wrxxnch/bettercraft/releases/latest",
+                description = "Baixe o APK oficial montado diretamente da página de Releases do GitHub.",
+                category = "Release"
+            ),
             DownloadLink(
                 id = "luanti_arm64",
                 title = "Luanti 5.17.0 (ARM64-v8a)",
@@ -46,7 +57,7 @@ data class AppConfig(
             ),
             DownloadLink(
                 id = "bettercraft_main",
-                title = "BetterCraft (Branch Main)",
+                title = "BetterCraft Subgame (Branch Main)",
                 url = "https://github.com/wrxxnch/bettercraft/archive/refs/heads/main.zip",
                 description = "Subgame BetterCraft com texturas Faithful, mods e mecânicas otimizadas.",
                 category = "Subgame"

@@ -39,6 +39,7 @@ import androidx.compose.material3.LinearProgressIndicator
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.key
 import androidx.compose.runtime.mutableFloatStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
@@ -75,20 +76,29 @@ fun WebViewScreen(
     var canGoBack by remember { mutableStateOf(false) }
     var canGoForward by remember { mutableStateOf(false) }
     var hasRenderCrashed by remember { mutableStateOf(false) }
+    var retryKey by remember { mutableStateOf(0) }
 
     var isEditingUrl by remember { mutableStateOf(false) }
     var editedUrlText by remember(currentUrl) { mutableStateOf(currentUrl) }
 
-    // Pre-create WebView cache directories to prevent simple_index_file.cc directory errors
+    // Pre-create WebView cache directories to prevent simple_index_file.cc and simple_file_enumerator.cc errors
     LaunchedEffect(Unit) {
         try {
+            val cacheBase = context.cacheDir
+            val webViewCache = File(cacheBase, "WebView")
+            val defaultCache = File(webViewCache, "Default")
+            val httpCache = File(defaultCache, "HTTP Cache")
+            val codeCache = File(httpCache, "Code Cache")
+            File(codeCache, "js").mkdirs()
+            File(codeCache, "wasm").mkdirs()
+
             val appDataDir = context.applicationInfo.dataDir
             val webviewDir = File(appDataDir, "app_webview")
-            if (!webviewDir.exists()) webviewDir.mkdirs()
             val defaultDir = File(webviewDir, "Default")
-            if (!defaultDir.exists()) defaultDir.mkdirs()
             val httpCacheDir = File(defaultDir, "HTTP Cache")
-            if (!httpCacheDir.exists()) httpCacheDir.mkdirs()
+            val codeCacheDir = File(httpCacheDir, "Code Cache")
+            File(codeCacheDir, "js").mkdirs()
+            File(codeCacheDir, "wasm").mkdirs()
         } catch (t: Throwable) {
             // Ignore directory creation failure
         }
@@ -186,6 +196,7 @@ fun WebViewScreen(
                     IconButton(
                         onClick = {
                             if (hasRenderCrashed) {
+                                retryKey++
                                 hasRenderCrashed = false
                                 isLoading = true
                             } else {
@@ -240,7 +251,7 @@ fun WebViewScreen(
                             MinecraftInputField(
                                 value = editedUrlText,
                                 onValueChange = { editedUrlText = it },
-                                placeholder = "https://bettercraftsite.vercel.app",
+                                placeholder = "https://wrxxnch.github.io/bettercraftsite",
                                 modifier = Modifier.weight(1f)
                             )
                             Spacer(modifier = Modifier.width(6.dp))
@@ -353,6 +364,7 @@ fun WebViewScreen(
                         MinecraftButton(
                             text = "TENTAR NAVEGADOR INTERNO NOVAMENTE",
                             onClick = {
+                                retryKey++
                                 hasRenderCrashed = false
                                 isLoading = true
                             },
@@ -371,99 +383,104 @@ fun WebViewScreen(
                     .weight(1f)
                     .border(2.dp, MinecraftPalette.ButtonBorderBlack)
             ) {
-                AndroidView(
-                    factory = { ctx ->
-                        WebView(ctx).apply {
-                            layoutParams = ViewGroup.LayoutParams(
-                                ViewGroup.LayoutParams.MATCH_PARENT,
-                                ViewGroup.LayoutParams.MATCH_PARENT
-                            )
+                key(retryKey) {
+                    AndroidView(
+                        factory = { ctx ->
+                            WebView(ctx).apply {
+                                layoutParams = ViewGroup.LayoutParams(
+                                    ViewGroup.LayoutParams.MATCH_PARENT,
+                                    ViewGroup.LayoutParams.MATCH_PARENT
+                                )
 
-                            // Force SOFTWARE rendering to prevent MESA rendernode GPU crash in emulator
-                            try {
-                                setLayerType(android.view.View.LAYER_TYPE_SOFTWARE, null)
-                            } catch (t: Throwable) {}
+                                // Configure layer type and drawing cache safely
+                                try {
+                                    setLayerType(android.view.View.LAYER_TYPE_SOFTWARE, null)
+                                } catch (t: Throwable) {}
 
-                            try {
-                                settings.apply {
-                                    javaScriptEnabled = true
-                                    domStorageEnabled = true
-                                    loadWithOverviewMode = true
-                                    useWideViewPort = true
-                                    builtInZoomControls = true
-                                    displayZoomControls = false
-                                    // LOAD_NO_CACHE avoids simple_index_file creation errors in virtual containers
-                                    cacheMode = WebSettings.LOAD_NO_CACHE
-                                    mediaPlaybackRequiresUserGesture = true
-                                    val curUa = userAgentString ?: ""
-                                    if (!curUa.contains("BetterCraftApp")) {
-                                        userAgentString = "$curUa BetterCraftApp/1.0"
+                                try {
+                                    settings.apply {
+                                        javaScriptEnabled = true
+                                        domStorageEnabled = true
+                                        loadWithOverviewMode = true
+                                        useWideViewPort = true
+                                        builtInZoomControls = true
+                                        displayZoomControls = false
+                                        // Use LOAD_NO_CACHE to prevent disk cache corruption in container
+                                        cacheMode = WebSettings.LOAD_NO_CACHE
+                                        mediaPlaybackRequiresUserGesture = true
+                                        allowFileAccess = false
+                                        allowContentAccess = false
+                                        databaseEnabled = false
+                                        val curUa = userAgentString ?: ""
+                                        if (!curUa.contains("BetterCraftApp")) {
+                                            userAgentString = "$curUa BetterCraftApp/1.0"
+                                        }
                                     }
-                                }
-                            } catch (t: Throwable) {}
+                                } catch (t: Throwable) {}
 
-                            webViewClient = object : WebViewClient() {
-                                override fun onPageStarted(view: WebView?, url: String?, favicon: Bitmap?) {
-                                    isLoading = true
-                                    canGoBack = view?.canGoBack() == true
-                                    canGoForward = view?.canGoForward() == true
-                                }
+                                webViewClient = object : WebViewClient() {
+                                    override fun onPageStarted(view: WebView?, url: String?, favicon: Bitmap?) {
+                                        isLoading = true
+                                        canGoBack = view?.canGoBack() == true
+                                        canGoForward = view?.canGoForward() == true
+                                    }
 
-                                override fun onPageFinished(view: WebView?, url: String?) {
-                                    isLoading = false
-                                    canGoBack = view?.canGoBack() == true
-                                    canGoForward = view?.canGoForward() == true
-                                }
-
-                                override fun onRenderProcessGone(view: WebView?, detail: RenderProcessGoneDetail?): Boolean {
-                                    // Must remove and destroy the crashed WebView according to Android Chromium specifications
-                                    try {
-                                        (view?.parent as? ViewGroup)?.removeView(view)
-                                        view?.destroy()
-                                    } catch (t: Throwable) {}
-                                    webViewInstance = null
-                                    hasRenderCrashed = true
-                                    isLoading = false
-                                    return true
-                                }
-                            }
-
-                            webChromeClient = object : WebChromeClient() {
-                                override fun onProgressChanged(view: WebView?, newProgress: Int) {
-                                    loadProgress = newProgress / 100f
-                                    if (newProgress >= 100) {
+                                    override fun onPageFinished(view: WebView?, url: String?) {
                                         isLoading = false
+                                        canGoBack = view?.canGoBack() == true
+                                        canGoForward = view?.canGoForward() == true
+                                    }
+
+                                    override fun onRenderProcessGone(view: WebView?, detail: RenderProcessGoneDetail?): Boolean {
+                                        // Must remove and destroy the crashed WebView according to Android Chromium specifications
+                                        try {
+                                            (view?.parent as? ViewGroup)?.removeView(view)
+                                            view?.destroy()
+                                        } catch (t: Throwable) {}
+                                        webViewInstance = null
+                                        hasRenderCrashed = true
+                                        isLoading = false
+                                        return true
                                     }
                                 }
-                            }
 
-                            try {
-                                loadUrl(currentUrl)
-                            } catch (t: Throwable) {
-                                hasRenderCrashed = true
+                                webChromeClient = object : WebChromeClient() {
+                                    override fun onProgressChanged(view: WebView?, newProgress: Int) {
+                                        loadProgress = newProgress / 100f
+                                        if (newProgress >= 100) {
+                                            isLoading = false
+                                        }
+                                    }
+                                }
+
+                                try {
+                                    loadUrl(currentUrl)
+                                } catch (t: Throwable) {
+                                    hasRenderCrashed = true
+                                }
+                                webViewInstance = this
                             }
-                            webViewInstance = this
-                        }
-                    },
-                    update = { view ->
-                        if (view.url != currentUrl && !isLoading) {
-                            try {
-                                view.loadUrl(currentUrl)
-                            } catch (t: Throwable) {
-                                hasRenderCrashed = true
+                        },
+                        update = { view ->
+                            if (view.url != currentUrl && !isLoading) {
+                                try {
+                                    view.loadUrl(currentUrl)
+                                } catch (t: Throwable) {
+                                    hasRenderCrashed = true
+                                }
                             }
-                        }
-                    },
-                    onRelease = { view ->
-                        try {
-                            view.stopLoading()
-                            view.webViewClient = WebViewClient()
-                            view.webChromeClient = null
-                            view.destroy()
-                        } catch (t: Throwable) {}
-                    },
-                    modifier = Modifier.fillMaxSize()
-                )
+                        },
+                        onRelease = { view ->
+                            try {
+                                view.stopLoading()
+                                view.webViewClient = WebViewClient()
+                                view.webChromeClient = null
+                                view.destroy()
+                            } catch (t: Throwable) {}
+                        },
+                        modifier = Modifier.fillMaxSize()
+                    )
+                }
             }
         }
     }

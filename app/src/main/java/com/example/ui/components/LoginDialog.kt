@@ -18,7 +18,6 @@ import androidx.compose.material.icons.filled.Close
 import androidx.compose.material.icons.filled.Lock
 import androidx.compose.material.icons.filled.Login
 import androidx.compose.material.icons.filled.Security
-import androidx.compose.material.icons.filled.Star
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
@@ -34,7 +33,6 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.window.Dialog
-import com.example.model.AdminConstants
 import com.example.ui.screens.MinecraftInputField
 
 @Composable
@@ -149,41 +147,6 @@ fun LoginDialog(
                         enabled = emailInput.isNotBlank(),
                         modifier = Modifier.fillMaxWidth()
                     )
-                }
-
-                // Owner Quick Access Button
-                Box(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .background(Color(0xFF2E2413))
-                        .border(1.dp, MinecraftPalette.GoldYellow)
-                        .padding(8.dp)
-                ) {
-                    Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
-                        Row(verticalAlignment = Alignment.CenterVertically) {
-                            Icon(
-                                imageVector = Icons.Default.Star,
-                                contentDescription = null,
-                                tint = MinecraftPalette.GoldYellow,
-                                modifier = Modifier.size(16.dp)
-                            )
-                            Spacer(modifier = Modifier.width(6.dp))
-                            MinecraftText(
-                                text = "ACESSO RÁPIDO DO OWNER",
-                                fontSize = 11,
-                                fontWeight = FontWeight.Bold,
-                                color = MinecraftPalette.GoldYellow
-                            )
-                        }
-                        MinecraftButton(
-                            text = "ENTRAR COMO OWNER (JEAN)",
-                            onClick = { onLoginEmail(AdminConstants.SUPER_ADMIN_EMAIL) },
-                            enabled = !isLoading,
-                            icon = Icons.Default.Star,
-                            modifier = Modifier.fillMaxWidth(),
-                            testTag = "btn_login_owner"
-                        )
-                    }
                 }
 
                 if (isLoading) {

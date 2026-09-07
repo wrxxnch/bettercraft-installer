@@ -31,6 +31,7 @@ class FirebaseRemoteManager(private val context: Context) {
         private const val KEY_BETTERCRAFT_ZIP = "pref_bettercraft_zip"
         private const val KEY_ASSETS_PATH = "pref_assets_path"
         private const val KEY_WEBVIEW_URL = "pref_webview_url"
+        private const val KEY_OUTPUT_DIR = "pref_output_dir"
         private const val KEY_SERVER_MESSAGE = "pref_server_message"
         private const val KEY_ADMIN_EMAILS = "pref_admin_emails"
     }
@@ -52,6 +53,7 @@ class FirebaseRemoteManager(private val context: Context) {
             bettercraftZipUrl = prefs.getString(KEY_BETTERCRAFT_ZIP, AppConfig.DEFAULT_BETTERCRAFT_ZIP_URL) ?: AppConfig.DEFAULT_BETTERCRAFT_ZIP_URL,
             targetAssetsPath = prefs.getString(KEY_ASSETS_PATH, AppConfig.DEFAULT_ASSETS_PATH) ?: AppConfig.DEFAULT_ASSETS_PATH,
             webViewUrl = prefs.getString(KEY_WEBVIEW_URL, AppConfig.DEFAULT_WEBVIEW_URL) ?: AppConfig.DEFAULT_WEBVIEW_URL,
+            outputDirectoryPath = prefs.getString(KEY_OUTPUT_DIR, AppConfig.DEFAULT_OUTPUT_DIRECTORY_PATH) ?: AppConfig.DEFAULT_OUTPUT_DIRECTORY_PATH,
             serverMessage = prefs.getString(KEY_SERVER_MESSAGE, "BetterCraft Luanti Engine v5.17 pronta para montagem!") ?: "Pronto",
             featuredLinks = AppConfig.defaultFeaturedLinks(),
             adminEmails = adminList
@@ -64,6 +66,7 @@ class FirebaseRemoteManager(private val context: Context) {
             .putString(KEY_BETTERCRAFT_ZIP, config.bettercraftZipUrl)
             .putString(KEY_ASSETS_PATH, config.targetAssetsPath)
             .putString(KEY_WEBVIEW_URL, config.webViewUrl)
+            .putString(KEY_OUTPUT_DIR, config.outputDirectoryPath)
             .putString(KEY_SERVER_MESSAGE, config.serverMessage)
             .putString(KEY_ADMIN_EMAILS, config.adminEmails.joinToString(","))
             .apply()
@@ -97,6 +100,7 @@ class FirebaseRemoteManager(private val context: Context) {
                 val modZip = snapshot.getString("bettercraft_zip_url") ?: AppConfig.DEFAULT_BETTERCRAFT_ZIP_URL
                 val assetsPath = snapshot.getString("target_assets_path") ?: AppConfig.DEFAULT_ASSETS_PATH
                 val webView = snapshot.getString("webview_url") ?: AppConfig.DEFAULT_WEBVIEW_URL
+                val outputDir = snapshot.getString("output_directory_path") ?: AppConfig.DEFAULT_OUTPUT_DIRECTORY_PATH
                 val message = snapshot.getString("server_message") ?: "Configuração remota ativa"
 
                 // Extract custom links list if present
@@ -126,6 +130,7 @@ class FirebaseRemoteManager(private val context: Context) {
                     bettercraftZipUrl = modZip,
                     targetAssetsPath = assetsPath,
                     webViewUrl = webView,
+                    outputDirectoryPath = outputDir,
                     serverMessage = message,
                     featuredLinks = links,
                     adminEmails = remoteAdmins
@@ -169,6 +174,7 @@ class FirebaseRemoteManager(private val context: Context) {
                 "bettercraft_zip_url" to config.bettercraftZipUrl,
                 "target_assets_path" to config.targetAssetsPath,
                 "webview_url" to config.webViewUrl,
+                "output_directory_path" to config.outputDirectoryPath,
                 "server_message" to config.serverMessage,
                 "admin_emails" to config.adminEmails,
                 "updated_at" to com.google.firebase.Timestamp.now(),

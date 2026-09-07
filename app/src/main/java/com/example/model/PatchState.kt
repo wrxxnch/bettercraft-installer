@@ -22,6 +22,14 @@ sealed interface PatchStep {
     data class DownloadingZip(val progress: Float, val currentBytes: Long, val totalBytes: Long) : PatchStep
     data class ExtractingAndInjecting(val currentFile: String, val processedCount: Int, val totalFiles: Int) : PatchStep
     data class SigningApk(val stepDetail: String) : PatchStep
-    data class Success(val signedApkFile: File, val sizeBytes: Long, val sha256Hex: String) : PatchStep
+    data class Success(
+        val signedApkFile: File,
+        val sizeBytes: Long,
+        val sha256Hex: String,
+        val outputDirectory: File? = null,
+        val gameZipFile: File? = null,
+        val gamesFolder: File? = null,
+        val luantiCopied: Boolean = false
+    ) : PatchStep
     data class Failed(val errorMessage: String, val details: String? = null) : PatchStep
 }

@@ -1,5 +1,7 @@
 package com.example.ui.screens
 
+import android.content.Intent
+import android.net.Uri
 import android.widget.Toast
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
@@ -22,6 +24,7 @@ import androidx.compose.material.icons.filled.Bookmark
 import androidx.compose.material.icons.filled.Check
 import androidx.compose.material.icons.filled.Folder
 import androidx.compose.material.icons.filled.Link
+import androidx.compose.material.icons.filled.OpenInBrowser
 import androidx.compose.material.icons.filled.RestartAlt
 import androidx.compose.material.icons.filled.Save
 import androidx.compose.material.icons.filled.Settings
@@ -62,6 +65,7 @@ fun SettingsScreen(
     var modZipUrl by remember(uiState.config.bettercraftZipUrl) { mutableStateOf(uiState.config.bettercraftZipUrl) }
     var assetsPath by remember(uiState.config.targetAssetsPath) { mutableStateOf(uiState.config.targetAssetsPath) }
     var webViewUrl by remember(uiState.config.webViewUrl) { mutableStateOf(uiState.config.webViewUrl) }
+    var outputDirectoryPath by remember(uiState.config.outputDirectoryPath) { mutableStateOf(uiState.config.outputDirectoryPath) }
 
     LazyColumn(
         modifier = modifier
@@ -130,6 +134,21 @@ fun SettingsScreen(
                             modifier = Modifier.weight(1f)
                         )
                     }
+
+                    MinecraftButton(
+                        text = "ABRIR GITHUB RELEASES (BAIXAR APK)",
+                        onClick = {
+                            val releaseUrl = "https://github.com/wrxxnch/bettercraft/releases/latest"
+                            val intent = Intent(Intent.ACTION_VIEW, Uri.parse(releaseUrl)).apply {
+                                flags = Intent.FLAG_ACTIVITY_NEW_TASK
+                            }
+                            try {
+                                context.startActivity(intent)
+                            } catch (_: Exception) {}
+                        },
+                        icon = Icons.Default.OpenInBrowser,
+                        modifier = Modifier.fillMaxWidth()
+                    )
                 }
             }
         }
@@ -214,13 +233,56 @@ fun SettingsScreen(
                     MinecraftInputField(
                         value = webViewUrl,
                         onValueChange = { webViewUrl = it },
-                        placeholder = "https://bettercraftsite.vercel.app"
+                        placeholder = "https://wrxxnch.github.io/bettercraftsite"
                     )
 
                     MinecraftText(
-                        text = "Padrão: https://bettercraftsite.vercel.app (Acesso protegido por login)",
+                        text = "Padrão: https://wrxxnch.github.io/bettercraftsite (Acesso protegido por login)",
                         fontSize = 10,
                         color = Color.Gray
+                    )
+                }
+            }
+        }
+
+        // Path Input: Output / Download Folder
+        item {
+            MinecraftPanel(modifier = Modifier.fillMaxWidth()) {
+                Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
+                    Row(verticalAlignment = Alignment.CenterVertically) {
+                        Icon(
+                            imageVector = Icons.Default.Folder,
+                            contentDescription = null,
+                            tint = MinecraftPalette.DiamondBlue,
+                            modifier = Modifier.size(16.dp)
+                        )
+                        Spacer(modifier = Modifier.width(6.dp))
+                        MinecraftText(
+                            text = "DIRETÓRIO DE DOWNLOAD / SAÍDA (PADRÃO)",
+                            fontSize = 12,
+                            color = MinecraftPalette.DiamondBlue
+                        )
+                    }
+
+                    MinecraftInputField(
+                        value = outputDirectoryPath,
+                        onValueChange = { outputDirectoryPath = it },
+                        placeholder = "/storage/emulated/0/Android/data/com.aistudio.bettercraft.vzkx/files/output/"
+                    )
+
+                    MinecraftText(
+                        text = "Padrão: /storage/emulated/0/Android/data/com.aistudio.bettercraft.vzkx/files/output/",
+                        fontSize = 10,
+                        color = Color.LightGray
+                    )
+
+                    MinecraftButton(
+                        text = "USAR DIRETÓRIO PADRÃO DO APP",
+                        onClick = {
+                            outputDirectoryPath = AppConfig.DEFAULT_OUTPUT_DIRECTORY_PATH
+                            Toast.makeText(context, "Caminho padrão restaurado!", Toast.LENGTH_SHORT).show()
+                        },
+                        modifier = Modifier.fillMaxWidth()
                     )
                 }
             }
@@ -270,7 +332,8 @@ fun SettingsScreen(
                             luantiApkUrl = luantiUrl.trim(),
                             bettercraftZipUrl = modZipUrl.trim(),
                             targetAssetsPath = assetsPath.trim(),
-                            webViewUrl = webViewUrl.trim()
+                            webViewUrl = webViewUrl.trim(),
+                            outputDirectoryPath = outputDirectoryPath.trim()
                         )
                         viewModel.saveConfig(newConfig)
                         Toast.makeText(context, "Configurações salvas!", Toast.LENGTH_SHORT).show()
@@ -288,6 +351,8 @@ fun SettingsScreen(
                         luantiUrl = AppConfig.DEFAULT_LUANTI_APK_URL
                         modZipUrl = AppConfig.DEFAULT_BETTERCRAFT_ZIP_URL
                         assetsPath = AppConfig.DEFAULT_ASSETS_PATH
+                        webViewUrl = AppConfig.DEFAULT_WEBVIEW_URL
+                        outputDirectoryPath = AppConfig.DEFAULT_OUTPUT_DIRECTORY_PATH
                         Toast.makeText(context, "Valores padrão restaurados!", Toast.LENGTH_SHORT).show()
                     },
                     icon = Icons.Default.RestartAlt,

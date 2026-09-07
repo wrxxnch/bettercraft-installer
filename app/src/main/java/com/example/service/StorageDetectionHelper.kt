@@ -82,6 +82,74 @@ object StorageDetectionHelper {
         )
     }
 
+    fun getPreferredOutputDir(context: Context, configuredPath: String? = null): File {
+        if (!configuredPath.isNullOrBlank()) {
+            try {
+                val configuredDir = File(configuredPath.trim())
+                if (configuredDir.exists() || configuredDir.mkdirs()) {
+                    if (isDirectoryWritable(configuredDir)) {
+                        return configuredDir
+                    }
+                }
+            } catch (e: Exception) {}
+        }
+
+        val specificPath = File("/storage/emulated/0/Android/data/${context.packageName}/files/output")
+        try {
+            if (specificPath.exists() || specificPath.mkdirs()) {
+                if (isDirectoryWritable(specificPath)) {
+                    return specificPath
+                }
+            }
+        } catch (e: Exception) {}
+
+        try {
+            val extFiles = context.getExternalFilesDir(null)
+            if (extFiles != null) {
+                val outDir = File(extFiles, "output")
+                if (outDir.exists() || outDir.mkdirs()) {
+                    return outDir
+                }
+            }
+        } catch (e: Exception) {}
+
+        val internalOut = File(context.filesDir, "output")
+        internalOut.mkdirs()
+        return internalOut
+    }
+
+    fun getLuantiUserDataDirs(): List<File> {
+        return listOf(
+            File("/storage/emulated/0/Android/data/net.minetest.minetest/files/Minetest"),
+            File("/storage/emulated/0/Android/data/net.minetest.minetest/files/minetest"),
+            File("/sdcard/Android/data/net.minetest.minetest/files/Minetest"),
+            File("/sdcard/Android/data/net.minetest.minetest/files/minetest")
+        )
+    }
+
+    fun copyDirectorySafely(source: File, destination: File): Boolean {
+        return try {
+            if (!source.exists()) return false
+            if (source.isDirectory) {
+                if (!destination.exists() && !destination.mkdirs()) return false
+                val children = source.listFiles() ?: return true
+                for (child in children) {
+                    copyDirectorySafely(child, File(destination, child.name))
+                }
+            } else {
+                destination.parentFile?.mkdirs()
+                source.inputStream().use { input ->
+                    destination.outputStream().use { output ->
+                        input.copyTo(output)
+                    }
+                }
+            }
+            true
+        } catch (e: Exception) {
+            false
+        }
+    }
+
     private fun isDirectoryWritable(dir: File): Boolean {
         if (!dir.exists() && !dir.mkdirs()) {
             return false

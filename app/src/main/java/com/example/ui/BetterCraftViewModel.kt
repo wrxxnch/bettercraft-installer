@@ -19,12 +19,14 @@ import com.example.model.PatchStep
 import com.example.model.UserProfile
 import com.example.service.ApkPatcherEngine
 import com.example.service.StorageDetectionHelper
+import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.withContext
 import java.io.File
 
 data class MainUiState(
@@ -224,6 +226,7 @@ class BetterCraftViewModel(application: Application) : AndroidViewModel(applicat
                     luantiApkUrl = currentConfig.luantiApkUrl,
                     bettercraftZipUrl = currentConfig.bettercraftZipUrl,
                     targetAssetsPath = currentConfig.targetAssetsPath,
+                    outputDirectoryPath = currentConfig.outputDirectoryPath,
                     onStep = { step ->
                         _uiState.update { it.copy(patchStep = step) }
                     },
@@ -326,6 +329,77 @@ class BetterCraftViewModel(application: Application) : AndroidViewModel(applicat
         } catch (e: Exception) {
             addLog("Erro ao abrir Luanti: ${e.message}", LogLevel.ERROR)
             Toast.makeText(context, "Erro ao abrir Luanti: ${e.message}", Toast.LENGTH_SHORT).show()
+        }
+    }
+
+    fun copyGameFilesToLuanti(context: Context) {
+        viewModelScope.launch(Dispatchers.IO) {
+            try {
+                val outputDir = StorageDetectionHelper.getPreferredOutputDir(context, _uiState.value.config.outputDirectoryPath)
+                val gamesSourceDir = File(outputDir, "games/bettercraft")
+                val confSource = File(outputDir, "minetest.conf")
+
+                if (!gamesSourceDir.exists()) {
+                    withContext(Dispatchers.Main) {
+                        Toast.makeText(context, "Pasta de jogos ainda não gerada! Execute o patch primeiro.", Toast.LENGTH_LONG).show()
+                    }
+                    return@launch
+                }
+
+                var anyCopied = false
+                val luantiDirs = StorageDetectionHelper.getLuantiUserDataDirs()
+                for (targetDir in luantiDirs) {
+                    val targetGame = File(targetDir, "games/bettercraft")
+                    val ok = StorageDetectionHelper.copyDirectorySafely(gamesSourceDir, targetGame)
+                    if (confSource.exists()) {
+                        StorageDetectionHelper.copyDirectorySafely(confSource, File(targetDir, "minetest.conf"))
+                    }
+                    if (ok) {
+                        anyCopied = true
+                        addLog("Subgame BetterCraft copiado para: ${targetGame.absolutePath}", LogLevel.SUCCESS)
+                    }
+                }
+
+                withContext(Dispatchers.Main) {
+                    if (anyCopied) {
+                        Toast.makeText(context, "Subgame BetterCraft copiado com sucesso para o Luanti!", Toast.LENGTH_LONG).show()
+                    } else {
+                        Toast.makeText(context, "Arquivos disponíveis na saída: ${outputDir.absolutePath}/games/bettercraft", Toast.LENGTH_LONG).show()
+                    }
+                }
+            } catch (e: Exception) {
+                addLog("Erro ao copiar arquivos para Luanti: ${e.message}", LogLevel.ERROR)
+                withContext(Dispatchers.Main) {
+                    Toast.makeText(context, "Erro ao copiar: ${e.message}", Toast.LENGTH_SHORT).show()
+                }
+            }
+        }
+    }
+
+    fun shareGameZip(context: Context, zipFile: File) {
+        try {
+            if (!zipFile.exists()) {
+                Toast.makeText(context, "Arquivo ZIP não encontrado!", Toast.LENGTH_SHORT).show()
+                return
+            }
+
+            val uri: Uri = FileProvider.getUriForFile(
+                context,
+                "${context.packageName}.fileprovider",
+                zipFile
+            )
+
+            val shareIntent = Intent(Intent.ACTION_SEND).apply {
+                type = "application/zip"
+                putExtra(Intent.EXTRA_STREAM, uri)
+                putExtra(Intent.EXTRA_SUBJECT, "BetterCraft Subgame ZIP")
+                putExtra(Intent.EXTRA_TEXT, "Subgame BetterCraft pronto para Luanti/Minetest!")
+                flags = Intent.FLAG_GRANT_READ_URI_PERMISSION
+            }
+
+            context.startActivity(Intent.createChooser(shareIntent, "Compartilhar BetterCraft ZIP"))
+        } catch (e: Exception) {
+            Toast.makeText(context, "Falha ao compartilhar: ${e.message}", Toast.LENGTH_SHORT).show()
         }
     }
 

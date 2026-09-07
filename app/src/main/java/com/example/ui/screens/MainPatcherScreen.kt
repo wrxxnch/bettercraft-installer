@@ -1,5 +1,7 @@
 package com.example.ui.screens
 
+import android.content.Intent
+import android.net.Uri
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
@@ -27,9 +29,11 @@ import androidx.compose.material.icons.filled.DeleteSweep
 import androidx.compose.material.icons.filled.Error
 import androidx.compose.material.icons.filled.FolderZip
 import androidx.compose.material.icons.filled.InstallMobile
+import androidx.compose.material.icons.filled.OpenInBrowser
 import androidx.compose.material.icons.filled.PlayArrow
 import androidx.compose.material.icons.filled.Security
 import androidx.compose.material.icons.filled.Share
+import androidx.compose.material.icons.filled.Sync
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
@@ -185,6 +189,15 @@ fun MainPatcherScreen(
                                     color = Color.LightGray
                                 )
                             }
+                            Row(verticalAlignment = Alignment.CenterVertically) {
+                                MinecraftBadge(text = "SAÍDA", color = MinecraftPalette.DiamondBlue)
+                                Spacer(modifier = Modifier.width(6.dp))
+                                MinecraftText(
+                                    text = uiState.config.outputDirectoryPath,
+                                    fontSize = 10,
+                                    color = Color.LightGray
+                                )
+                            }
                             if (uiState.detectedEnvironment.isNotBlank()) {
                                 Row(verticalAlignment = Alignment.CenterVertically) {
                                     MinecraftBadge(text = "AMBIENTE", color = MinecraftPalette.DiamondBlue)
@@ -226,6 +239,21 @@ fun MainPatcherScreen(
                                 icon = Icons.Default.CloudDownload,
                                 modifier = Modifier.fillMaxWidth(),
                                 testTag = "btn_start_patch"
+                            )
+                            MinecraftButton(
+                                text = "BAIXAR APK DIRETO DO GITHUB RELEASES",
+                                onClick = {
+                                    val releaseUrl = "https://github.com/wrxxnch/bettercraft/releases/latest"
+                                    val intent = Intent(Intent.ACTION_VIEW, Uri.parse(releaseUrl)).apply {
+                                        flags = Intent.FLAG_ACTIVITY_NEW_TASK
+                                    }
+                                    try {
+                                        context.startActivity(intent)
+                                    } catch (_: Exception) {}
+                                },
+                                icon = Icons.Default.OpenInBrowser,
+                                modifier = Modifier.fillMaxWidth(),
+                                testTag = "btn_download_github_release"
                             )
                         }
 
@@ -306,16 +334,30 @@ fun MainPatcherScreen(
                                     )
                                     Spacer(modifier = Modifier.width(8.dp))
                                     MinecraftText(
-                                        text = "APK PRONTO E ASSINADO!",
+                                        text = "APK & JOGO PRONTOS!",
                                         fontSize = 14,
                                         color = MinecraftPalette.EmeraldGreen
                                     )
                                 }
                                 MinecraftText(
-                                    text = "Arquivo: ${step.signedApkFile.name} (${formatBytes(step.sizeBytes)})",
+                                    text = "Arquivo APK: ${step.signedApkFile.name} (${formatBytes(step.sizeBytes)})",
                                     fontSize = 11,
                                     color = Color.White
                                 )
+                                step.outputDirectory?.let { outDir ->
+                                    MinecraftText(
+                                        text = "Diretório de Saída: ${outDir.absolutePath}",
+                                        fontSize = 10,
+                                        color = MinecraftPalette.DiamondBlue
+                                    )
+                                }
+                                if (step.luantiCopied) {
+                                    MinecraftText(
+                                        text = "✓ Subgame BetterCraft copiado automaticamente para o Luanti!",
+                                        fontSize = 10,
+                                        color = MinecraftPalette.EmeraldGreen
+                                    )
+                                }
 
                                 MinecraftButton(
                                     text = "INSTALAR APK NO DISPOSITIVO",
@@ -324,6 +366,14 @@ fun MainPatcherScreen(
                                     icon = Icons.Default.InstallMobile,
                                     modifier = Modifier.fillMaxWidth(),
                                     testTag = "btn_install_apk"
+                                )
+
+                                MinecraftButton(
+                                    text = "COPIAR JOGO PARA PASTA DO LUANTI",
+                                    onClick = { viewModel.copyGameFilesToLuanti(context) },
+                                    icon = Icons.Default.Sync,
+                                    modifier = Modifier.fillMaxWidth(),
+                                    testTag = "btn_copy_to_luanti"
                                 )
 
                                 MinecraftButton(
@@ -339,18 +389,28 @@ fun MainPatcherScreen(
                                     horizontalArrangement = Arrangement.spacedBy(8.dp)
                                 ) {
                                     MinecraftButton(
-                                        text = "COMPARTILHAR",
+                                        text = "COMPARTILHAR APK",
                                         onClick = { viewModel.shareApk(context, step.signedApkFile) },
                                         icon = Icons.Default.Share,
                                         modifier = Modifier.weight(1f)
                                     )
-                                    MinecraftButton(
-                                        text = "NOVA MONTAGEM",
-                                        onClick = { viewModel.startPatchProcess() },
-                                        icon = Icons.Default.Build,
-                                        modifier = Modifier.weight(1f)
-                                    )
+                                    val zipFile = step.gameZipFile
+                                    if (zipFile != null && zipFile.exists()) {
+                                        MinecraftButton(
+                                            text = "COMPARTILHAR ZIP",
+                                            onClick = { viewModel.shareGameZip(context, zipFile) },
+                                            icon = Icons.Default.FolderZip,
+                                            modifier = Modifier.weight(1f)
+                                        )
+                                    }
                                 }
+
+                                MinecraftButton(
+                                    text = "NOVA MONTAGEM",
+                                    onClick = { viewModel.startPatchProcess() },
+                                    icon = Icons.Default.Build,
+                                    modifier = Modifier.fillMaxWidth()
+                                )
                             }
                         }
 

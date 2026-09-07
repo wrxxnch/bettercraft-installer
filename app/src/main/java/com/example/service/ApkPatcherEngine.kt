@@ -33,13 +33,14 @@ class ApkPatcherEngine(private val context: Context) {
         luantiApkUrl: String,
         bettercraftZipUrl: String,
         targetAssetsPath: String,
+        outputDirectoryPath: String? = null,
         onStep: (PatchStep) -> Unit,
         onLog: (String, LogLevel) -> Unit
     ): File = withContext(Dispatchers.IO) {
-        // Detect storage root dynamically for current environment (e.g. sdk_gphone64_arm64)
+        // Resolve preferred output directory (default: /storage/emulated/0/Android/data/com.aistudio.bettercraft.vzkx/files/output/)
         val storageInfo = StorageDetectionHelper.detectStorageRoot(context)
         val workspaceDir = File(context.cacheDir, "patcher_workspace").apply { mkdirs() }
-        val outputDir = File(storageInfo.rootDir, "output").apply { mkdirs() }
+        val outputDir = StorageDetectionHelper.getPreferredOutputDir(context, outputDirectoryPath)
 
         val luantiApkFile = File(workspaceDir, "luanti_base.apk")
         val modZipFile = File(workspaceDir, "bettercraft_mod.zip")
@@ -49,8 +50,7 @@ class ApkPatcherEngine(private val context: Context) {
         try {
             onLog("Iniciando processo de montagem do BetterCraft Luanti...", LogLevel.INFO)
             onLog("Dispositivo/Ambiente: ${storageInfo.deviceIdentifier}", LogLevel.INFO)
-            onLog("Raiz de Armazenamento Detectada: ${storageInfo.rootDir.absolutePath}", LogLevel.SUCCESS)
-            onLog("Tipo: ${storageInfo.description}", LogLevel.INFO)
+            onLog("Diretório de Saída: ${outputDir.absolutePath}", LogLevel.SUCCESS)
             onLog("Engine Base: $luantiApkUrl", LogLevel.INFO)
             onLog("Repositório Mod: $bettercraftZipUrl", LogLevel.INFO)
             onLog("Destino Assets: $targetAssetsPath", LogLevel.INFO)
@@ -80,6 +80,10 @@ class ApkPatcherEngine(private val context: Context) {
                 fileLabel = "BetterCraft Zip"
             )
             onLog("BetterCraft Zip baixado com sucesso: ${formatBytes(modZipFile.length())}", LogLevel.SUCCESS)
+
+            // Save subgame files directly to output directory and Luanti folders
+            onLog("Salvando estrutura de jogos BetterCraft em: ${outputDir.absolutePath}", LogLevel.INFO)
+            val (gameZipFile, gamesFolder, luantiCopied) = extractAndDeployGameFiles(modZipFile, outputDir, onLog)
 
             // Step 3: Inject BetterCraft into APK assets
             onLog("Passo 3/4: Descompactando e inserindo arquivos na pasta de assets do APK...", LogLevel.PROGRESS)
@@ -113,9 +117,20 @@ class ApkPatcherEngine(private val context: Context) {
             val sha256 = calculateSha256(signedApkFile)
             onLog("APK final assinado com sucesso! Tamanho: ${formatBytes(signedApkFile.length())}", LogLevel.SUCCESS)
             onLog("SHA-256: $sha256", LogLevel.INFO)
-            onLog("Local do arquivo: ${signedApkFile.absolutePath}", LogLevel.INFO)
+            onLog("Local do APK: ${signedApkFile.absolutePath}", LogLevel.SUCCESS)
+            onLog("Pasta de jogos: ${gamesFolder.absolutePath}", LogLevel.SUCCESS)
 
-            onStep(PatchStep.Success(signedApkFile, signedApkFile.length(), sha256))
+            onStep(
+                PatchStep.Success(
+                    signedApkFile = signedApkFile,
+                    sizeBytes = signedApkFile.length(),
+                    sha256Hex = sha256,
+                    outputDirectory = outputDir,
+                    gameZipFile = gameZipFile,
+                    gamesFolder = gamesFolder,
+                    luantiCopied = luantiCopied
+                )
+            )
             return@withContext signedApkFile
 
         } catch (e: Exception) {
@@ -380,7 +395,19 @@ class ApkPatcherEngine(private val context: Context) {
 
             if (relativeName.isEmpty()) continue
 
-            val destPath = "$innerGameFolder$relativeName"
+            val destPath = when {
+                relativeName.startsWith("games/") -> relativeName
+                relativeName.startsWith("mods/") -> relativeName
+                relativeName.startsWith("textures/") -> relativeName
+                relativeName.startsWith("fonts/") -> relativeName
+                relativeName.startsWith("locale/") -> relativeName
+                relativeName.startsWith("builtin/") -> relativeName
+                relativeName.startsWith("client/") -> relativeName
+                relativeName == "minetest.conf" -> "minetest.conf"
+                relativeName.endsWith("game.conf") -> "games/bettercraft/game.conf"
+                else -> "$innerGameFolder$relativeName"
+            }
+
             if (!writtenEntries.contains(destPath)) {
                 val newEntry = ZipEntry(destPath)
                 newEntry.method = ZipEntry.DEFLATED
@@ -405,6 +432,7 @@ class ApkPatcherEngine(private val context: Context) {
             val defaultConf = """
                 # BetterCraft Luanti Configuration
                 default_game = bettercraft
+                menu_last_game = bettercraft
                 main_menu_game_mgr = 1
                 secure.enable_security = false
             """.trimIndent()
@@ -418,7 +446,101 @@ class ApkPatcherEngine(private val context: Context) {
         zos.flush()
         zos.close()
 
-        onLog("Injetados $modFileCount arquivos em assets.zip/$innerGameFolder com sucesso!", LogLevel.SUCCESS)
+        onLog("Injetados $modFileCount arquivos em assets.zip com sucesso!", LogLevel.SUCCESS)
+    }
+
+    private fun extractAndDeployGameFiles(
+        modZipFile: File,
+        outputDir: File,
+        onLog: (String, LogLevel) -> Unit
+    ): Triple<File, File, Boolean> {
+        val gamesDir = File(outputDir, "games")
+        val bettercraftDir = File(gamesDir, "bettercraft")
+        val modsDir = File(outputDir, "mods")
+        bettercraftDir.mkdirs()
+        modsDir.mkdirs()
+
+        val outputGameZip = File(outputDir, "bettercraft-game.zip")
+        try {
+            modZipFile.copyTo(outputGameZip, overwrite = true)
+        } catch (e: Exception) {
+            onLog("Aviso ao salvar backup do zip do jogo: ${e.message}", LogLevel.WARNING)
+        }
+
+        var filesExtracted = 0
+        try {
+            val zip = ZipFile(modZipFile)
+            val commonPrefix = findCommonPrefix(zip)
+            val entries = zip.entries()
+            while (entries.hasMoreElements()) {
+                val entry = entries.nextElement()
+                if (entry.isDirectory) continue
+                val rawName = entry.name
+                val relativeName = if (commonPrefix.isNotEmpty() && rawName.startsWith(commonPrefix)) {
+                    rawName.removePrefix(commonPrefix)
+                } else {
+                    rawName
+                }.trimStart('/')
+
+                if (relativeName.isEmpty()) continue
+
+                val targetFile = when {
+                    relativeName.startsWith("games/") -> File(outputDir, relativeName)
+                    relativeName.startsWith("mods/") -> File(outputDir, relativeName)
+                    relativeName == "minetest.conf" -> File(outputDir, "minetest.conf")
+                    relativeName.endsWith("game.conf") -> File(bettercraftDir, "game.conf")
+                    else -> File(bettercraftDir, relativeName)
+                }
+
+                targetFile.parentFile?.mkdirs()
+                zip.getInputStream(entry).use { input ->
+                    targetFile.outputStream().use { output ->
+                        input.copyTo(output)
+                    }
+                }
+                filesExtracted++
+            }
+            zip.close()
+        } catch (e: Exception) {
+            onLog("Erro ao extrair arquivos do jogo para o diretório de saída: ${e.message}", LogLevel.ERROR)
+        }
+
+        // Ensure default minetest.conf exists in outputDir
+        val outputConf = File(outputDir, "minetest.conf")
+        if (!outputConf.exists() || !outputConf.readText().contains("default_game")) {
+            val confContent = """
+                # BetterCraft Luanti Configuration
+                default_game = bettercraft
+                menu_last_game = bettercraft
+                main_menu_game_mgr = 1
+                secure.enable_security = false
+            """.trimIndent()
+            outputConf.writeText(confContent)
+        }
+
+        onLog("Extraídos $filesExtracted arquivos do BetterCraft em: ${bettercraftDir.absolutePath}", LogLevel.SUCCESS)
+
+        // Try copying to Luanti data directory so Luanti doesn't crash from missing games/
+        var luantiCopied = false
+        val luantiDirs = StorageDetectionHelper.getLuantiUserDataDirs()
+        for (targetLuantiDir in luantiDirs) {
+            try {
+                val luantiGamesDir = File(targetLuantiDir, "games/bettercraft")
+                val copiedGame = StorageDetectionHelper.copyDirectorySafely(bettercraftDir, luantiGamesDir)
+                val luantiConf = File(targetLuantiDir, "minetest.conf")
+                if (outputConf.exists()) {
+                    StorageDetectionHelper.copyDirectorySafely(outputConf, luantiConf)
+                }
+                if (copiedGame) {
+                    luantiCopied = true
+                    onLog("Subgame BetterCraft copiado com sucesso para Luanti: ${luantiGamesDir.absolutePath}", LogLevel.SUCCESS)
+                }
+            } catch (e: Exception) {
+                // Scoped storage or folder not created yet
+            }
+        }
+
+        return Triple(outputGameZip, bettercraftDir, luantiCopied)
     }
 
     private fun repackageApkDirectAssets(
@@ -480,7 +602,18 @@ class ApkPatcherEngine(private val context: Context) {
 
             if (relativeName.isEmpty()) continue
 
-            val destPath = "$destFolder$relativeName"
+            val destPath = when {
+                relativeName.startsWith("games/") -> "assets/$relativeName"
+                relativeName.startsWith("mods/") -> "assets/$relativeName"
+                relativeName.startsWith("textures/") -> "assets/$relativeName"
+                relativeName.startsWith("fonts/") -> "assets/$relativeName"
+                relativeName.startsWith("locale/") -> "assets/$relativeName"
+                relativeName.startsWith("builtin/") -> "assets/$relativeName"
+                relativeName.startsWith("client/") -> "assets/$relativeName"
+                relativeName == "minetest.conf" -> "assets/minetest.conf"
+                relativeName.endsWith("game.conf") -> "assets/games/bettercraft/game.conf"
+                else -> "$destFolder$relativeName"
+            }
             val newEntry = ZipEntry(destPath)
             newEntry.method = ZipEntry.DEFLATED
 
