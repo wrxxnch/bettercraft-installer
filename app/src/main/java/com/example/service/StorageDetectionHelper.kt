@@ -167,4 +167,32 @@ object StorageDetectionHelper {
             false
         }
     }
+
+    /**
+     * Checks if running on a virtual device, cloud emulator, or headless container
+     * that lacks hardware DRM graphics rendernodes (Mesa software rasterizer).
+     */
+    fun isVirtualOrEmulatorEnvironment(): Boolean {
+        val f = Build.FINGERPRINT.lowercase()
+        val m = Build.MODEL.lowercase()
+        val p = Build.PRODUCT.lowercase()
+        val h = Build.HARDWARE.lowercase()
+        val b = Build.BRAND.lowercase()
+        val d = Build.DEVICE.lowercase()
+
+        return f.startsWith("generic") ||
+                f.startsWith("unknown") ||
+                m.contains("google_sdk") ||
+                m.contains("emulator") ||
+                m.contains("android sdk built for") ||
+                p.contains("sdk_") ||
+                p.contains("google_sdk") ||
+                p.contains("emulator") ||
+                p.contains("simulator") ||
+                h.contains("goldfish") ||
+                h.contains("ranchu") ||
+                (b.startsWith("generic") && d.startsWith("generic")) ||
+                !File("/dev/dri").exists() && (h.contains("goldfish") || h.contains("ranchu") || p.contains("sdk"))
+    }
 }
+

@@ -4,6 +4,7 @@ import android.annotation.SuppressLint
 import android.content.Intent
 import android.graphics.Bitmap
 import android.net.Uri
+import android.os.Build
 import android.view.ViewGroup
 import android.webkit.RenderProcessGoneDetail
 import android.webkit.WebChromeClient
@@ -51,6 +52,7 @@ import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.viewinterop.AndroidView
+import com.example.service.StorageDetectionHelper
 import com.example.ui.BetterCraftViewModel
 import com.example.ui.MainUiState
 import com.example.ui.components.MinecraftBadge
@@ -75,7 +77,7 @@ fun WebViewScreen(
     var loadProgress by remember { mutableFloatStateOf(0f) }
     var canGoBack by remember { mutableStateOf(false) }
     var canGoForward by remember { mutableStateOf(false) }
-    var hasRenderCrashed by remember { mutableStateOf(false) }
+    val hasRenderCrashed = uiState.isWebViewCompatibilityMode
     var retryKey by remember { mutableStateOf(0) }
 
     var isEditingUrl by remember { mutableStateOf(false) }
@@ -197,7 +199,7 @@ fun WebViewScreen(
                         onClick = {
                             if (hasRenderCrashed) {
                                 retryKey++
-                                hasRenderCrashed = false
+                                viewModel.setWebViewCompatibilityMode(false)
                                 isLoading = true
                             } else {
                                 try {
@@ -214,26 +216,26 @@ fun WebViewScreen(
                             modifier = Modifier.size(16.dp)
                         )
                     }
-
-                    IconButton(
-                        onClick = {
-                            try {
-                                val browserIntent = Intent(Intent.ACTION_VIEW, Uri.parse(currentUrl))
-                                context.startActivity(browserIntent)
-                            } catch (e: Exception) {
-                                Toast.makeText(context, "Erro ao abrir: ${e.message}", Toast.LENGTH_SHORT).show()
-                            }
-                        },
-                        modifier = Modifier.size(30.dp)
-                    ) {
-                        Icon(
-                            imageVector = Icons.Default.OpenInBrowser,
-                            contentDescription = "Abrir no Navegador",
-                            tint = MinecraftPalette.EmeraldGreen,
-                            modifier = Modifier.size(16.dp)
-                        )
-                    }
                 }
+
+                // Botão destacado no topo para abrir o site em outro navegador
+                MinecraftButton(
+                    text = "ABRIR EM OUTRO NAVEGADOR",
+                    onClick = {
+                        try {
+                            val browserIntent = Intent(Intent.ACTION_VIEW, Uri.parse(currentUrl))
+                            context.startActivity(browserIntent)
+                        } catch (e: Exception) {
+                            Toast.makeText(context, "Erro ao abrir navegador: ${e.message}", Toast.LENGTH_SHORT).show()
+                        }
+                    },
+                    isActionGreen = true,
+                    icon = Icons.Default.OpenInBrowser,
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .height(34.dp),
+                    testTag = "btn_top_open_other_browser"
+                )
 
                 // Inline Edit URL bar (for administrators)
                 if (isEditingUrl && uiState.isAdmin) {
@@ -265,8 +267,10 @@ fun WebViewScreen(
                                         }
                                         viewModel.updateWebsiteUrl(finalUrl)
                                         isEditingUrl = false
-                                        hasRenderCrashed = false
-                                        webViewInstance?.loadUrl(finalUrl)
+                                        if (!StorageDetectionHelper.isVirtualOrEmulatorEnvironment()) {
+                                            viewModel.setWebViewCompatibilityMode(false)
+                                            webViewInstance?.loadUrl(finalUrl)
+                                        }
                                         Toast.makeText(context, "Link do site atualizado!", Toast.LENGTH_SHORT).show()
                                     }
                                 },
@@ -365,7 +369,7 @@ fun WebViewScreen(
                             text = "TENTAR NAVEGADOR INTERNO NOVAMENTE",
                             onClick = {
                                 retryKey++
-                                hasRenderCrashed = false
+                                viewModel.setWebViewCompatibilityMode(false)
                                 isLoading = true
                             },
                             icon = Icons.Default.Refresh,
@@ -384,6 +388,7 @@ fun WebViewScreen(
                     .border(2.dp, MinecraftPalette.ButtonBorderBlack)
             ) {
                 key(retryKey) {
+                    var isRenderDead = false
                     AndroidView(
                         factory = { ctx ->
                             WebView(ctx).apply {
@@ -391,11 +396,6 @@ fun WebViewScreen(
                                     ViewGroup.LayoutParams.MATCH_PARENT,
                                     ViewGroup.LayoutParams.MATCH_PARENT
                                 )
-
-                                // Configure layer type and drawing cache safely
-                                try {
-                                    setLayerType(android.view.View.LAYER_TYPE_SOFTWARE, null)
-                                } catch (t: Throwable) {}
 
                                 try {
                                     settings.apply {
@@ -405,12 +405,14 @@ fun WebViewScreen(
                                         useWideViewPort = true
                                         builtInZoomControls = true
                                         displayZoomControls = false
-                                        // Use LOAD_NO_CACHE to prevent disk cache corruption in container
-                                        cacheMode = WebSettings.LOAD_NO_CACHE
+                                        cacheMode = WebSettings.LOAD_DEFAULT
                                         mediaPlaybackRequiresUserGesture = true
                                         allowFileAccess = false
                                         allowContentAccess = false
                                         databaseEnabled = false
+                                        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
+                                            safeBrowsingEnabled = false
+                                        }
                                         val curUa = userAgentString ?: ""
                                         if (!curUa.contains("BetterCraftApp")) {
                                             userAgentString = "$curUa BetterCraftApp/1.0"
@@ -432,14 +434,13 @@ fun WebViewScreen(
                                     }
 
                                     override fun onRenderProcessGone(view: WebView?, detail: RenderProcessGoneDetail?): Boolean {
-                                        // Must remove and destroy the crashed WebView according to Android Chromium specifications
+                                        isRenderDead = true
+                                        viewModel.setWebViewCompatibilityMode(true)
+                                        isLoading = false
+                                        webViewInstance = null
                                         try {
-                                            (view?.parent as? ViewGroup)?.removeView(view)
                                             view?.destroy()
                                         } catch (t: Throwable) {}
-                                        webViewInstance = null
-                                        hasRenderCrashed = true
-                                        isLoading = false
                                         return true
                                     }
                                 }
@@ -456,27 +457,27 @@ fun WebViewScreen(
                                 try {
                                     loadUrl(currentUrl)
                                 } catch (t: Throwable) {
-                                    hasRenderCrashed = true
+                                    viewModel.setWebViewCompatibilityMode(true)
                                 }
                                 webViewInstance = this
                             }
                         },
                         update = { view ->
-                            if (view.url != currentUrl && !isLoading) {
+                            if (!isRenderDead && view.url != currentUrl && !isLoading) {
                                 try {
                                     view.loadUrl(currentUrl)
                                 } catch (t: Throwable) {
-                                    hasRenderCrashed = true
+                                    viewModel.setWebViewCompatibilityMode(true)
                                 }
                             }
                         },
                         onRelease = { view ->
-                            try {
-                                view.stopLoading()
-                                view.webViewClient = WebViewClient()
-                                view.webChromeClient = null
-                                view.destroy()
-                            } catch (t: Throwable) {}
+                            if (!isRenderDead) {
+                                try {
+                                    view.stopLoading()
+                                    view.destroy()
+                                } catch (t: Throwable) {}
+                            }
                         },
                         modifier = Modifier.fillMaxSize()
                     )

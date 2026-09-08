@@ -42,7 +42,8 @@ data class MainUiState(
     val authError: String? = null,
     val showLoginDialog: Boolean = false,
     val detectedStoragePath: String = "",
-    val detectedEnvironment: String = ""
+    val detectedEnvironment: String = "",
+    val isWebViewCompatibilityMode: Boolean = false
 ) {
     val isAdmin: Boolean
         get() = currentUser?.isAdmin == true || currentUser?.isSuperAdmin == true
@@ -66,15 +67,20 @@ class BetterCraftViewModel(application: Application) : AndroidViewModel(applicat
         // Load local configuration on startup
         val initialConfig = remoteManager.loadLocalConfig()
         val storageInfo = StorageDetectionHelper.detectStorageRoot(application)
+        val isVirtual = StorageDetectionHelper.isVirtualOrEmulatorEnvironment()
         _uiState.update {
             it.copy(
                 config = initialConfig,
                 detectedStoragePath = storageInfo.rootDir.absolutePath,
-                detectedEnvironment = storageInfo.deviceIdentifier
+                detectedEnvironment = storageInfo.deviceIdentifier,
+                isWebViewCompatibilityMode = false
             )
         }
         addLog("BetterCraft Luanti Installer inicializado com sucesso.", LogLevel.INFO)
         addLog("Ambiente Detectado: ${storageInfo.deviceIdentifier}", LogLevel.INFO)
+        if (isVirtual) {
+            addLog("Modo de compatibilidade web ativado para ambiente emulado.", LogLevel.INFO)
+        }
         addLog("Raiz de Armazenamento Ativa: ${storageInfo.rootDir.absolutePath} (${storageInfo.description})", LogLevel.SUCCESS)
         addLog("Pronto para baixar, injetar mods e assinar APK.", LogLevel.INFO)
 
@@ -90,6 +96,10 @@ class BetterCraftViewModel(application: Application) : AndroidViewModel(applicat
 
     fun selectTab(index: Int) {
         _uiState.update { it.copy(selectedTab = index) }
+    }
+
+    fun setWebViewCompatibilityMode(enabled: Boolean) {
+        _uiState.update { it.copy(isWebViewCompatibilityMode = enabled) }
     }
 
     fun showLoginDialog(show: Boolean = true) {
