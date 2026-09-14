@@ -46,6 +46,7 @@ import com.example.ui.BetterCraftViewModel
 import com.example.ui.MainUiState
 import com.example.ui.components.MinecraftBadge
 import com.example.ui.components.MinecraftButton
+import com.example.ui.components.MinecraftInputField
 import com.example.ui.components.MinecraftPalette
 import com.example.ui.components.MinecraftPanel
 import com.example.ui.components.MinecraftText

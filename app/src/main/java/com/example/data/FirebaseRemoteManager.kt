@@ -34,6 +34,7 @@ class FirebaseRemoteManager(private val context: Context) {
         private const val KEY_OUTPUT_DIR = "pref_output_dir"
         private const val KEY_SERVER_MESSAGE = "pref_server_message"
         private const val KEY_ADMIN_EMAILS = "pref_admin_emails"
+        private const val KEY_WEB_CLIENT_ID = "pref_web_client_id"
     }
 
     fun loadLocalConfig(): AppConfig {
@@ -56,7 +57,8 @@ class FirebaseRemoteManager(private val context: Context) {
             outputDirectoryPath = prefs.getString(KEY_OUTPUT_DIR, AppConfig.DEFAULT_OUTPUT_DIRECTORY_PATH) ?: AppConfig.DEFAULT_OUTPUT_DIRECTORY_PATH,
             serverMessage = prefs.getString(KEY_SERVER_MESSAGE, "BetterCraft Luanti Engine v5.17 pronta para montagem!") ?: "Pronto",
             featuredLinks = AppConfig.defaultFeaturedLinks(),
-            adminEmails = adminList
+            adminEmails = adminList,
+            googleWebClientId = prefs.getString(KEY_WEB_CLIENT_ID, AdminConstants.DEFAULT_GOOGLE_WEB_CLIENT_ID) ?: AdminConstants.DEFAULT_GOOGLE_WEB_CLIENT_ID
         )
     }
 
@@ -69,6 +71,7 @@ class FirebaseRemoteManager(private val context: Context) {
             .putString(KEY_OUTPUT_DIR, config.outputDirectoryPath)
             .putString(KEY_SERVER_MESSAGE, config.serverMessage)
             .putString(KEY_ADMIN_EMAILS, config.adminEmails.joinToString(","))
+            .putString(KEY_WEB_CLIENT_ID, config.googleWebClientId)
             .apply()
     }
 
@@ -133,7 +136,8 @@ class FirebaseRemoteManager(private val context: Context) {
                     outputDirectoryPath = outputDir,
                     serverMessage = message,
                     featuredLinks = links,
-                    adminEmails = remoteAdmins
+                    adminEmails = remoteAdmins,
+                    googleWebClientId = snapshot.getString("google_web_client_id") ?: AdminConstants.DEFAULT_GOOGLE_WEB_CLIENT_ID
                 )
 
                 // Save locally as cache
@@ -177,6 +181,7 @@ class FirebaseRemoteManager(private val context: Context) {
                 "output_directory_path" to config.outputDirectoryPath,
                 "server_message" to config.serverMessage,
                 "admin_emails" to config.adminEmails,
+                "google_web_client_id" to config.googleWebClientId,
                 "updated_at" to com.google.firebase.Timestamp.now(),
                 "featured_links" to config.featuredLinks.map {
                     mapOf(

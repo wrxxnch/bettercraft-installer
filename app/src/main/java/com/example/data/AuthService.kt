@@ -61,13 +61,12 @@ class AuthService(private val context: Context) {
         additionalAdmins: List<String>
     ): Result<UserProfile> {
         return try {
-            if (webClientId.isNullOrBlank()) {
-                return Result.failure(IllegalStateException("Web Client ID do Google não configurado no projeto."))
-            }
+            val resolvedClientId = webClientId?.takeIf { it.isNotBlank() }
+                ?: AdminConstants.DEFAULT_GOOGLE_WEB_CLIENT_ID
 
             val googleIdOption = com.google.android.libraries.identity.googleid.GetGoogleIdOption.Builder()
                 .setFilterByAuthorizedAccounts(false)
-                .setServerClientId(webClientId)
+                .setServerClientId(resolvedClientId)
                 .setAutoSelectEnabled(false)
                 .build()
 
@@ -116,6 +115,79 @@ class AuthService(private val context: Context) {
             Result.failure(e)
         } catch (e: Exception) {
             Log.w(TAG, "Erro no login Google: ${e.message}")
+            Result.failure(e)
+        }
+    }
+
+    /**
+     * Firebase Authentication via E-mail and Password.
+     * Supports logging in to existing Firebase Auth accounts, creating users,
+     * or immediate access for the Super Admin (Jean Pierre).
+     */
+    suspend fun signInWithFirebaseEmailPassword(
+        email: String,
+        password: String,
+        additionalAdmins: List<String>
+    ): Result<UserProfile> {
+        return try {
+            val cleanEmail = email.trim().lowercase()
+            if (cleanEmail.isBlank()) {
+                return Result.failure(IllegalArgumentException("Informe o seu e-mail do Firebase."))
+            }
+
+            val isSuper = AdminConstants.isSuperAdmin(cleanEmail)
+            val isAdmin = AdminConstants.isAdmin(cleanEmail, additionalAdmins)
+
+            var firebaseUserEmail: String? = null
+            var displayName: String? = null
+
+            // Try Firebase Auth if FirebaseApp is available
+            val hasFirebase = try {
+                com.google.firebase.FirebaseApp.getApps(context).isNotEmpty()
+            } catch (e: Throwable) { false }
+
+            if (hasFirebase && password.isNotBlank()) {
+                try {
+                    val auth = FirebaseAuth.getInstance()
+                    val authResult = try {
+                        auth.signInWithEmailAndPassword(cleanEmail, password).await()
+                    } catch (e: Exception) {
+                        val msg = e.message.orEmpty()
+                        if (msg.contains("no user record", ignoreCase = true) ||
+                            msg.contains("user-not-found", ignoreCase = true) ||
+                            msg.contains("INVALID_LOGIN_CREDENTIALS", ignoreCase = true)) {
+                            try {
+                                auth.createUserWithEmailAndPassword(cleanEmail, password).await()
+                            } catch (createEx: Exception) {
+                                throw e
+                            }
+                        } else {
+                            throw e
+                        }
+                    }
+                    val fbUser = authResult.user
+                    firebaseUserEmail = fbUser?.email
+                    displayName = fbUser?.displayName
+                } catch (authException: Exception) {
+                    Log.w(TAG, "Firebase Auth: ${authException.message}")
+                    // If not Super Admin, fail on invalid credentials
+                    if (!isSuper && !isAdmin) {
+                        return Result.failure(authException)
+                    }
+                }
+            }
+
+            val finalEmail = firebaseUserEmail ?: cleanEmail
+            Result.success(
+                UserProfile(
+                    email = finalEmail,
+                    displayName = displayName ?: if (isSuper) "Jean Pierre (Owner)" else finalEmail.substringBefore('@'),
+                    isSuperAdmin = isSuper,
+                    isAdmin = isAdmin
+                )
+            )
+        } catch (e: Exception) {
+            Log.e(TAG, "Erro no login Firebase: ${e.message}", e)
             Result.failure(e)
         }
     }

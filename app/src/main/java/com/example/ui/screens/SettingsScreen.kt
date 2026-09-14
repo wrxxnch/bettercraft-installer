@@ -24,6 +24,7 @@ import androidx.compose.material.icons.filled.Bookmark
 import androidx.compose.material.icons.filled.Check
 import androidx.compose.material.icons.filled.Folder
 import androidx.compose.material.icons.filled.Link
+import androidx.compose.material.icons.filled.Lock
 import androidx.compose.material.icons.filled.OpenInBrowser
 import androidx.compose.material.icons.filled.RestartAlt
 import androidx.compose.material.icons.filled.Save
@@ -49,6 +50,7 @@ import com.example.ui.BetterCraftViewModel
 import com.example.ui.MainUiState
 import com.example.ui.components.MinecraftBadge
 import com.example.ui.components.MinecraftButton
+import com.example.ui.components.MinecraftInputField
 import com.example.ui.components.MinecraftPalette
 import com.example.ui.components.MinecraftPanel
 import com.example.ui.components.MinecraftText
@@ -66,6 +68,7 @@ fun SettingsScreen(
     var assetsPath by remember(uiState.config.targetAssetsPath) { mutableStateOf(uiState.config.targetAssetsPath) }
     var webViewUrl by remember(uiState.config.webViewUrl) { mutableStateOf(uiState.config.webViewUrl) }
     var outputDirectoryPath by remember(uiState.config.outputDirectoryPath) { mutableStateOf(uiState.config.outputDirectoryPath) }
+    var googleWebClientId by remember(uiState.config.googleWebClientId) { mutableStateOf(uiState.config.googleWebClientId) }
 
     LazyColumn(
         modifier = modifier
@@ -322,6 +325,40 @@ fun SettingsScreen(
             }
         }
 
+        // Google Web Client ID
+        item {
+            MinecraftPanel(modifier = Modifier.fillMaxWidth()) {
+                Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
+                    Row(verticalAlignment = Alignment.CenterVertically) {
+                        Icon(
+                            imageVector = Icons.Default.Lock,
+                            contentDescription = null,
+                            tint = MinecraftPalette.EmeraldGreen,
+                            modifier = Modifier.size(16.dp)
+                        )
+                        Spacer(modifier = Modifier.width(6.dp))
+                        MinecraftText(
+                            text = "GOOGLE WEB CLIENT ID (FIREBASE AUTH)",
+                            fontSize = 12,
+                            color = MinecraftPalette.EmeraldGreen
+                        )
+                    }
+
+                    MinecraftInputField(
+                        value = googleWebClientId,
+                        onValueChange = { googleWebClientId = it },
+                        placeholder = "ID do cliente Web do Google"
+                    )
+
+                    MinecraftText(
+                        text = "Utilizado para login administrativo via Google Credential Manager.",
+                        fontSize = 10,
+                        color = Color.LightGray
+                    )
+                }
+            }
+        }
+
         // Save & Reset Action Buttons
         item {
             Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
@@ -333,7 +370,8 @@ fun SettingsScreen(
                             bettercraftZipUrl = modZipUrl.trim(),
                             targetAssetsPath = assetsPath.trim(),
                             webViewUrl = webViewUrl.trim(),
-                            outputDirectoryPath = outputDirectoryPath.trim()
+                            outputDirectoryPath = outputDirectoryPath.trim(),
+                            googleWebClientId = googleWebClientId.trim()
                         )
                         viewModel.saveConfig(newConfig)
                         Toast.makeText(context, "Configurações salvas!", Toast.LENGTH_SHORT).show()
@@ -360,41 +398,5 @@ fun SettingsScreen(
                 )
             }
         }
-    }
-}
-
-@Composable
-fun MinecraftInputField(
-    value: String,
-    onValueChange: (String) -> Unit,
-    placeholder: String,
-    modifier: Modifier = Modifier
-) {
-    Box(
-        modifier = modifier
-            .fillMaxWidth()
-            .clip(RoundedCornerShape(2.dp))
-            .background(Color(0xFF0C0D0E))
-            .border(1.5.dp, Color(0xFF33353A))
-            .padding(horizontal = 10.dp, vertical = 10.dp)
-    ) {
-        if (value.isEmpty()) {
-            MinecraftText(
-                text = placeholder,
-                fontSize = 11,
-                color = Color.DarkGray
-            )
-        }
-        BasicTextField(
-            value = value,
-            onValueChange = onValueChange,
-            textStyle = TextStyle(
-                color = Color.White,
-                fontSize = 12.sp,
-                fontFamily = FontFamily.Monospace
-            ),
-            cursorBrush = SolidColor(MinecraftPalette.EmeraldGreen),
-            modifier = Modifier.fillMaxWidth()
-        )
     }
 }

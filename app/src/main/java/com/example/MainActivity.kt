@@ -92,7 +92,8 @@ fun BetterCraftApp(viewModel: BetterCraftViewModel) {
     if (uiState.showLoginDialog) {
         LoginDialog(
             onDismiss = { viewModel.showLoginDialog(false) },
-            onLoginGoogle = { viewModel.loginWithGoogle() },
+            onLoginFirebase = { email, password -> viewModel.loginWithFirebase(email, password) },
+            onLoginDirect = { email -> viewModel.loginWithEmail(email) },
             isLoading = uiState.isAuthLoading,
             errorMessage = uiState.authError
         )

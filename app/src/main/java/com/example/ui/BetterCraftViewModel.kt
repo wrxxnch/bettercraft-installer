@@ -109,7 +109,10 @@ class BetterCraftViewModel(application: Application) : AndroidViewModel(applicat
     fun loginWithGoogle(webClientId: String? = null) {
         viewModelScope.launch {
             _uiState.update { it.copy(isAuthLoading = true, authError = null) }
-            val result = authService.signInWithGoogleCredential(webClientId, _uiState.value.config.adminEmails)
+            val targetClientId = webClientId?.takeIf { it.isNotBlank() }
+                ?: _uiState.value.config.googleWebClientId.takeIf { it.isNotBlank() }
+                ?: AdminConstants.DEFAULT_GOOGLE_WEB_CLIENT_ID
+            val result = authService.signInWithGoogleCredential(targetClientId, _uiState.value.config.adminEmails)
             result.onSuccess { user ->
                 _uiState.update {
                     it.copy(
@@ -131,6 +134,36 @@ class BetterCraftViewModel(application: Application) : AndroidViewModel(applicat
                     )
                 }
                 addLog("Aviso Login Google: ${error.message}", LogLevel.WARNING)
+            }
+        }
+    }
+
+    fun loginWithFirebase(email: String, password: String) {
+        viewModelScope.launch {
+            _uiState.update { it.copy(isAuthLoading = true, authError = null) }
+            val result = authService.signInWithFirebaseEmailPassword(email, password, _uiState.value.config.adminEmails)
+            result.onSuccess { user ->
+                _uiState.update {
+                    it.copy(
+                        currentUser = user,
+                        isAuthLoading = false,
+                        showLoginDialog = false,
+                        authError = null
+                    )
+                }
+                if (user.isAdmin) {
+                    addLog("Firebase Login: ${user.email} [ADMINISTRADOR AUTORIZADO]", LogLevel.SUCCESS)
+                } else {
+                    addLog("Firebase Login: ${user.email} [USUÁRIO SEM PRIVILÉGIOS]", LogLevel.INFO)
+                }
+            }.onFailure { error ->
+                _uiState.update {
+                    it.copy(
+                        isAuthLoading = false,
+                        authError = error.localizedMessage ?: "Falha ao autenticar no Firebase."
+                    )
+                }
+                addLog("Falha Firebase Auth: ${error.message}", LogLevel.ERROR)
             }
         }
     }

@@ -10,6 +10,7 @@ data class UserProfile(
 
 object AdminConstants {
     const val SUPER_ADMIN_EMAIL = "jeanpierreowner@gmail.com"
+    const val DEFAULT_GOOGLE_WEB_CLIENT_ID = "148024991584-60s8mp1mcbufvm1osiff1mddvpavmr1g.apps.googleusercontent.com"
 
     fun isSuperAdmin(email: String?): Boolean {
         if (email.isNullOrBlank()) return false

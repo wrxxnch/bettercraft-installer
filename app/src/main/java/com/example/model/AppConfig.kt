@@ -16,7 +16,8 @@ data class AppConfig(
     val outputDirectoryPath: String = DEFAULT_OUTPUT_DIRECTORY_PATH,
     val serverMessage: String = "BetterCraft Voxel Edition v5.17.0 pronta para montagem!",
     val featuredLinks: List<DownloadLink> = defaultFeaturedLinks(),
-    val adminEmails: List<String> = defaultAdmins()
+    val adminEmails: List<String> = defaultAdmins(),
+    val googleWebClientId: String = AdminConstants.DEFAULT_GOOGLE_WEB_CLIENT_ID
 ) {
     companion object {
         const val DEFAULT_LUANTI_APK_URL =
